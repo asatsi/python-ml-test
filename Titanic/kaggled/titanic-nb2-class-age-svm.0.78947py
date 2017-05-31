@@ -1,0 +1,89 @@
+import pandas as pd
+import numpy as np
+from sklearn.naive_bayes import GaussianNB
+
+filename="train.csv"
+
+def train_csv():
+	#PassengerId,Survived,Pclass,Name,Sex,Age,SibSp,Parch,Ticket,Fare,Cabin,Embarked
+	#dataframe1  = pd.read_csv("train.csv",usecols=(1,2,3,4,5,6,7,9))
+	dataframe1  = pd.read_csv("train.csv",usecols=("Survived","Pclass","Name","Sex","Age","SibSp","Parch","Fare","Cabin"))
+	#print("dataframe1 training:\n",dataframe1.head(10))
+
+	#Add another column to categorize age range 0-15, 15-above
+	#master should have an age of 15 and rest to have median of the above range if age is missing
+	length=len(dataframe1.values[0])
+	median_age = dataframe1.Age.median()
+	dataframe1.Age.fillna(median_age,inplace=True)
+	dataframe1.replace("female",0,inplace=True)
+	dataframe1.replace("male",1,inplace=True)
+	dataframe1.insert(length,"ClassAge",9999)
+	dataframe1.ClassAge = dataframe1.Age.apply(lambda x:1 if 16 <= x <= 1000 else 0)
+	
+	#insert new column for underage flag and default it to 0
+	dataframe1.insert(len(dataframe1.values[0]) ,"UnderAge", 0)
+	dataframe1.UnderAge = dataframe1.Name.str.contains("Master").astype(int)
+	print (dataframe1.tail(3))
+
+	#insert new column for sheltered passengers
+	dataframe1.insert(len(dataframe1.values[0]) ,"Sheltered", 0)
+	dataframe1.Sheltered = dataframe1.Cabin.notnull().astype(int)
+	print (dataframe1.head(3))
+
+	#print(dataframe2.head(3))
+	features_training=dataframe1.iloc[:,[1,3,5,6,10,11]]
+	labels_training=dataframe1.iloc[:,0]
+	print("Features training:\n",features_training.head(3))
+	#print("Labels training:\n",labels_training.head(10))
+	return (features_training,labels_training,median_age)
+
+def test(median_age):
+	#PassengerId,Pclass,Name,Sex,Age,SibSp,Parch,Ticket,Fare,Cabin,Embarked
+	test_data  = pd.read_csv("test.csv",usecols=(1,2,3,4,5,6,8,9))
+
+	length = len(test_data.values[0])
+	test_data.insert(length,"ClassAge",median_age)
+	test_data.Age.fillna(median_age,inplace=True)
+	test_data.ClassAge = test_data.Age.apply(lambda x:1 if 16 <= x <= 1000 else 0)
+
+	#insert new column for underage flag and default it to 0
+	test_data.insert(len(test_data.values[0]) ,"UnderAge", 0)
+	test_data.UnderAge = test_data.Name.str.contains("Master").astype(int)
+	#print (test_data.head(3))
+
+	#insert new column for sheltered passengers
+	test_data.insert(len(test_data.values[0]) ,"Sheltered", 0)
+	test_data.Sheltered = test_data.Cabin.notnull().astype(int)
+	#print (test_data.head(3))
+
+	test_data.replace("female",0,inplace=True)
+	test_data.replace("male",1,inplace=True)
+
+	#Quick hack for missing Fare, as we know the test data only contains one record without fare beloging to Pclass=3
+	test_data.Fare.fillna(0,inplace=True)
+
+	test_data2 = test_data.iloc[:,[0,2,4,5,9,10]]
+	labels_test = test_data2.iloc[:,0]
+	print("test_data2:\n",test_data2.head(5))
+	return (test_data2,labels_test)
+
+def print_results(results):
+	count=892
+	print("PassengerId,Survived")
+	for i in results:
+		print(count,",",i,sep="")
+		count += 1
+
+(features_training,labels_training,median_age) = train_csv()
+(features_test,labels_test) = test(median_age)
+
+from sklearn.svm import SVC
+
+#clf = GaussianNB()
+clf = SVC()
+print("Inside Main now Features:\n",features_training.head(10))
+print("Inside Main now Tests:\n",features_test.head(10))
+print("Test Set:\n",features_test)
+clf.fit(features_training,labels_training)
+results = clf.predict(features_test)
+print_results(results)
